@@ -1,4 +1,5 @@
 import os
+from xml.dom.pulldom import ErrorHandler
 from flask import Flask, request, abort, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
@@ -8,25 +9,48 @@ from models import setup_db, Question, Category
 
 QUESTIONS_PER_PAGE = 10
 
+def paginate_questions(request, selection):
+    page = request.args.get("page", 1, type=int)
+    start = (page - 1) * QUESTIONS_PER_PAGE
+    end = start + QUESTIONS_PER_PAGE
+
+    questions = [q.format() for q in selection]
+    current_questions = questions[start:end]
+
+    return current_questions
+
+
 def create_app(test_config=None):
     # create and configure the app
     app = Flask(__name__)
     setup_db(app)
-
     """
-    @TODO: Set up CORS. Allow '*' for origins. Delete the sample route after completing the TODOs
+    @TODO: DONE. Set up CORS. Allow '*' for origins. Delete the sample route after completing the TODOs
     """
-
+    CORS(app)
+    # CORS(app, resources={r"*/api/*" : {"origins": '*'}})
     """
-    @TODO: Use the after_request decorator to set Access-Control-Allow
+    @TODO: DONE. Use the after_request decorator to set Access-Control-Allow
     """
+    # CORS Headers
+    @app.after_request
+    def after_request(response):
+        response.headers.add(
+            "Access-Control-Allow-Headers", "Content-Type,Authorization,true"
+        )
+        response.headers.add(
+            "Access-Control-Allow-Methods", "GET,PUT,PATCH,POST,DELETE,OPTIONS"
+        )
+        return response
 
     """
     @TODO:
     Create an endpoint to handle GET requests
     for all available categories.
     """
-
+    @app.route('/')
+    def homepage():
+        return jsonify({"message": "hello"})
 
     """
     @TODO:
@@ -40,6 +64,22 @@ def create_app(test_config=None):
     ten questions per page and pagination at the bottom of the screen for three pages.
     Clicking on the page numbers should update the questions.
     """
+    @app.route('/questions')
+    def get_questions():
+        all_quest = Question.query.order_by(Question.difficulty).all()
+        current_questions = paginate_questions(request, all_quest)
+
+        if len(all_quest) == 0:
+            abort(404)
+
+        return jsonify({
+            'success': True,
+            'questions': current_questions,
+            'total_questions': len(all_quest),
+            'categories': [cat.type for cat in Category.query.all()],
+            'current_cateogry': []
+        })
+
 
     """
     @TODO:
@@ -97,6 +137,8 @@ def create_app(test_config=None):
     Create error handlers for all expected errors
     including 404 and 422.
     """
+
+
 
     return app
 
